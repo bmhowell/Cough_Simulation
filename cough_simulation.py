@@ -1,11 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from mpl_toolkits.mplot3d.axes3d import Axes3D
+from mpl_toolkits import mplot3d
+from celluloid import Camera
+import time
+import datetime
 
 #---------------- constants --------------------
-h0 = np.array([0, 2, 0]).T      # starting height (m)
+r0 = np.array([0, 2, 0]).T      # starting height (m)
 g = np.array([0, -9.81, 0]).T   # gravity (m/s^2)
-time = 4                        # simulation time (s)
-dt = 1e-6                       # time step (s)
+time = 1                        # simulation time (s)
+dt = 1e-3                       # time step (s)
 V0 = 30                         # magnitude of cough velocity (m / s)
 rho = 1000                      # density of particles (kg / m^3)
 mTot = 0.0005                   # total mass of droplets (kg)
@@ -40,7 +46,7 @@ while counter:
         i += 1
 Aci = np.asarray(Aci)
 R = np.asarray(R).T
-mi = np.asarray(mi).T
+mi = np.asarray(mi)
 
 # initial trajectories
 Nc = np.array([0, 1, 0]).T      # direction of cough [x, y, z]
@@ -63,27 +69,31 @@ for i in range(pTot):
     nPart[i, 2] = NPart[i, 2] / nMag
 
 v0 = V0 * nPart
-print('v0 = ', v0.shape)
+
+#---------------- solution arrays --------------------
+rSol = []
+vSol = []
 
 # ---------------------------------------------
 # ----------- Begin time stepping -------------
 # ---------------------------------------------
-
 tspace = np.arange(0, time + dt, dt)
 ones = np.ones(pTot)
-Cd = np.zeros(pTot)
-vi = v0
-for i in range(1):
 
+vi = v0
+ri = np.outer(r0, ones).T
+
+rSol.append(ri)
+vSol.append(vi)
+
+for i in range(len(tspace)):
+    print('i = {} / {}'.format(i, len(tspace)))
+    Cd = np.zeros(pTot)
     # compute forces
     fGrav = np.outer(mi, g)
-    print(fGrav.shape)
 
     vf_ = np.outer(vf, ones).T
     vdiff = np.linalg.norm(vf - vi, 2, 1)
-    # vdiff2 = np.linalg.norm(vf_-vi, 2, 1)
-
-
 
     Re = (2 * R * rhoF * vdiff / muf).T
 
@@ -94,23 +104,69 @@ for i in range(1):
     cond5 = np.where(np.logical_and(Re > 2e6, Re > 1.0))[0]
 
     if len(cond1) > 0:
-        Cd[cond1] = 24. / Re[cond1]
+        Cd[cond1] = 24. / np.squeeze(Re[cond1])
     if len(cond2) > 0:
-        Cd[cond2] = 24. / np.power(Re[cond2], 0.646)
+        Cd[cond2] = 24. / np.squeeze(np.power(Re[cond2], 0.646))
     if len(cond3) > 0:
         Cd[cond3] = 0.5
     if len(cond4) > 0:
-        Cd[cond4] = 0.000366 * np.power(Re[cond3], 0.4275)
+        Cd[cond4] = 0.000366 * np.squeeze(np.power(Re[cond4], 0.4275))
     if len(cond5) > 0:
         Cd[cond5] = 0.18
 
-    print('shape Cd: ', Cd.shape)
-    print('shape Aci: ', Aci.shape)
-    print('shape vdiff: ', vdiff.shape)
-    print('shape vi: ', vi.shape)
-    print('shape vf: ', (vi-vf).shape)
-    # fDrag = 0.5 * Cd * rhoF * Aci * vdiff * (vi - vf)
-    # print('fDrag = ', fDrag)
+    Cd = np.reshape(Cd, (len(Cd), 1))
+    vdiff = np.reshape(Cd, (len(vdiff), 1))
+
+    # https://stackoverflow.com/questions/18522216/multiplying-across-in-a-numpy-array
+    fDrag_constant = np.squeeze(0.5 * Cd * rhoF * Aci * vdiff)
+    fDrag = ((vi - vf).T * fDrag_constant).T
+
+    fTot = fDrag + fGrav
+
+    ri = ri + dt*v0
+    vi = vi + dt*(fTot / mi)
+
+    rSol.append(ri)
+    vSol.append(vi)
+
+
+counter1 = 0
+
+for j in range(len(rSol)):
+    if j % 10 == 0:
+        xt = rSol[j]
+        print('shape of xt: ', xt)
+        save_path1 = "/Users/bhopro/Desktop/Berkeley/MSOL/COVID19/output/state_matrix.txt.{}".format(counter1)
+
+        f = open(save_path1, "w+")
+        f.write('time , ID , X-coord , Y-coord , Z-coord \n')
+
+        # iterate through number of particles
+        time_elapsed = tspace[j]
+
+        counter2 = 0
+
+        for k in range(len(xt[:, 0])):
+            x = xt[k, 0]
+            y = xt[k, 1]
+            z = xt[k, 2]
+            mass = mi[k]
+            f.write('{} , {}, {}, {}, {} \n'.format(time_elapsed, mass, x, y, z))
+            counter2 += 1
+
+        f.close()
+
+    counter1 += 1
+
+
+
+
+
+
+
+
+
+
 
 
 
