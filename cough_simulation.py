@@ -49,7 +49,7 @@ R = np.asarray(R).T
 mi = np.asarray(mi)
 
 # initial trajectories
-Nc = np.array([0, 1, 0]).T      # direction of cough [x, y, z]
+Nc = np.array([1, 0, 0]).T      # direction of cough [x, y, z]
 NPart = np.zeros((pTot, 3))     # perturbed direction for each particle [xi, yi, zi]
 nPart = np.zeros((pTot, 3))     # normalized vector for each particle [nx, ny, nz]
 Ac = np.array([1, 0.5, 1]).T    # deviatoric constants [Ax, Ay, Az]
@@ -85,18 +85,16 @@ ri = np.outer(r0, ones).T
 
 rSol.append(ri)
 vSol.append(vi)
+fGrav = np.outer(mi, g)
 
 for i in range(len(tspace)):
     print('i = {} / {}'.format(i, len(tspace)))
     Cd = np.zeros(pTot)
     # compute forces
-    fGrav = np.outer(mi, g)
 
-    vf_ = np.outer(vf, ones).T
     vdiff = np.linalg.norm(vf - vi, 2, 1)
 
     Re = (2 * R * rhoF * vdiff / muf).T
-
     cond1 = np.where(np.logical_and(Re > 0, Re <= 1.0))[0]
     cond2 = np.where(np.logical_and(Re > 1.0, Re <= 400))[0]
     cond3 = np.where(np.logical_and(Re > 400, Re <= 3e5))[0]
@@ -119,42 +117,43 @@ for i in range(len(tspace)):
 
     # https://stackoverflow.com/questions/18522216/multiplying-across-in-a-numpy-array
     fDrag_constant = np.squeeze(0.5 * Cd * rhoF * Aci * vdiff)
-    fDrag = ((vi - vf).T * fDrag_constant).T
+    fDrag = ((vf - vi).T * fDrag_constant).T
 
     fTot = fDrag + fGrav
 
     ri = ri + dt*v0
     vi = vi + dt*(fTot / mi)
 
-    rSol.append(ri)
-    vSol.append(vi)
+    if i % 10 == 0:
+        rSol.append(ri)
 
 
 counter1 = 0
-
+mi = mi * 1e-6
 for j in range(len(rSol)):
-    if j % 10 == 0:
-        xt = rSol[j]
-        print('shape of xt: ', xt)
-        save_path1 = "/Users/bhopro/Desktop/Berkeley/MSOL/COVID19/output/state_matrix.txt.{}".format(counter1)
+    print('j = {} / {}'.format(j, len(rSol)))
 
-        f = open(save_path1, "w+")
-        f.write('time , ID , X-coord , Y-coord , Z-coord \n')
+    xt = rSol[j]
 
-        # iterate through number of particles
-        time_elapsed = tspace[j]
+    save_path1 = "/Users/bhopro/Desktop/Berkeley/MSOL/COVID19/output/state_matrix.txt.{}".format(counter1)
 
-        counter2 = 0
+    f = open(save_path1, "w+")
+    f.write('time , ID , X-coord , Y-coord , Z-coord \n')
 
-        for k in range(len(xt[:, 0])):
-            x = xt[k, 0]
-            y = xt[k, 1]
-            z = xt[k, 2]
-            mass = mi[k]
-            f.write('{} , {}, {}, {}, {} \n'.format(time_elapsed, mass, x, y, z))
-            counter2 += 1
+    # iterate through number of particles
+    time_elapsed = tspace[j]
 
-        f.close()
+    counter2 = 0
+
+    for k in range(len(xt[:, 0])):
+        x = xt[k, 0]
+        y = xt[k, 1]
+        z = xt[k, 2]
+        mass = mi[k]
+        f.write('{} , {}, {}, {}, {} \n'.format(time_elapsed, mass, x, y, z))
+        counter2 += 1
+
+    f.close()
 
     counter1 += 1
 
