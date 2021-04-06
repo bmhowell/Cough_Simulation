@@ -85,6 +85,12 @@ ri = np.outer(r0, ones).T
 rSol.append(ri)
 fGrav = np.outer(mi, g)
 
+inAir = np.ones(len(ri), dtype=bool)
+timeFlight = np.zeros(len(inAir))
+
+print('ri.shape = ', ri.shape)
+print('inAir = ', inAir)
+
 for i in range(len(tspace)):
     print('i = {} / {}'.format(i, len(tspace)))
     Cd = np.zeros(pTot)
