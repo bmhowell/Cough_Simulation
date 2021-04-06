@@ -7,10 +7,11 @@ from celluloid import Camera
 import time
 import datetime
 
+start_time = time.time()
 #---------------- constants --------------------
 r0 = np.array([0, 2, 0]).T      # starting height (m)
 g = np.array([0, -9.81, 0]).T   # gravity (m/s^2)
-time = 1                        # simulation time (s)
+t_tot = 1                        # simulation time (s)
 dt = 1e-3                       # time step (s)
 V0 = 30                         # magnitude of cough velocity (m / s)
 rho = 1000                      # density of particles (kg / m^3)
@@ -49,10 +50,10 @@ R = np.asarray(R).T
 mi = np.asarray(mi)
 
 # initial trajectories
-Nc = np.array([1, 0, 0]).T      # direction of cough [x, y, z]
+Nc = np.array([1., 0, 0]).T     # direction of cough [x, y, z]
 NPart = np.zeros((pTot, 3))     # perturbed direction for each particle [xi, yi, zi]
 nPart = np.zeros((pTot, 3))     # normalized vector for each particle [nx, ny, nz]
-Ac = np.array([1, 0.5, 1]).T    # deviatoric constants [Ax, Ay, Az]
+Ac = np.array([0.5, 1., 1.]).T  # deviatoric constants [Ax, Ay, Az]
 
 for i in range(pTot):
     eta = [np.random.randint(low=-1000, high=1000, size=1)/1000,
@@ -77,14 +78,11 @@ vSol = []
 # ---------------------------------------------
 # ----------- Begin time stepping -------------
 # ---------------------------------------------
-tspace = np.arange(0, time + dt, dt)
+tspace = np.arange(0, t_tot + dt, dt)
 ones = np.ones(pTot)
-
 vi = v0
 ri = np.outer(r0, ones).T
-
 rSol.append(ri)
-vSol.append(vi)
 fGrav = np.outer(mi, g)
 
 for i in range(len(tspace)):
@@ -121,7 +119,7 @@ for i in range(len(tspace)):
 
     fTot = fDrag + fGrav
 
-    ri = ri + dt*v0
+    ri = ri + dt*vi
     vi = vi + dt*(fTot / mi)
 
     if i % 10 == 0:
@@ -129,12 +127,10 @@ for i in range(len(tspace)):
 
 
 counter1 = 0
-mi = mi * 1e-6
+Rplot = R * 1e4
 for j in range(len(rSol)):
     print('j = {} / {}'.format(j, len(rSol)))
-
     xt = rSol[j]
-
     save_path1 = "/Users/bhopro/Desktop/Berkeley/MSOL/COVID19/output/state_matrix.txt.{}".format(counter1)
 
     f = open(save_path1, "w+")
@@ -150,12 +146,15 @@ for j in range(len(rSol)):
         y = xt[k, 1]
         z = xt[k, 2]
         mass = mi[k]
-        f.write('{} , {}, {}, {}, {} \n'.format(time_elapsed, mass, x, y, z))
+        f.write('{} , {}, {}, {}, {} \n'.format(time_elapsed, Rplot, x, y, z))
         counter2 += 1
 
     f.close()
 
     counter1 += 1
+
+print('')
+print('--- total time: {} min ---'.format((time.time() - start_time) / 60))
 
 
 
