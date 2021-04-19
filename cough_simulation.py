@@ -1,9 +1,9 @@
 from mpl_toolkits import mplot3d
 import numpy as np
-import matplotlib.pyplot as pl
-
+import matplotlib.pyplot as plt
 import time
 import datetime
+
 
 start_time = time.time()
 
@@ -11,7 +11,7 @@ start_time = time.time()
 r0 = np.array([0, 2, 0]).T      # starting height (m)
 g = np.array([0, -9.81, 0]).T   # gravity (m/s^2)
 t_tot = 1                        # simulation time (s)
-dt = 1e-3                       # time step (s)
+dt = 1e-6                       # time step (s)
 V0 = 30                         # magnitude of cough velocity (m / s)
 rho = 1000                      # density of particles (kg / m^3)
 mTot = 0.0005                   # total mass of droplets (kg)
@@ -20,26 +20,22 @@ vf = np.array([0, 0, 0]).T      # surrounding fluid velocity (m/s)
 muf = 1.8e-5                    # surrounding fluid viscosity (Pa/s)
 rhoF = 1.225                    # density of air (kg / m^3)
 
-#---------------- particle generation --------------------
-R_ave = 0.0001                  # average particle radius (m)
-R = []                          # vector containing particle radii
-Mtot = 0                        # track total number of particles
-mi = []                         # mass of each particle (kg)
-Aci = []                        # cross sectional area of each particle (m^2)
-A = 0.9975                      # deviatiatoric constant
-i = 0                           # index
-counter = True                  # counter
+# ---------------- particle generation --------------------
+R_ave = 0.0001  # average particle radius (m)
+R = []  # vector containing particle radii
+Mtot = 0  # track total number of particles
+mi = []  # mass of each particle (kg)
+Aci = []  # cross sectional area of each particle (m^2)
+A = 0.9975  # deviatiatoric constant
+i = 0  # index
+counter = True  # counter
 
-
-'''
-produce enough random particles with a random ditribution of 
-'''
 while counter:
-    xi = np.random.randint(low=-1000, high=1000, size=1)/1000;
+    xi = np.random.randint(low=-1000, high=1000, size=1) / 1000;
     R.append(R_ave * (1 + A * xi))
-    Mtot = Mtot + rho*(4/3)*np.pi*R[-1]**3
-    mi.append(rho*(4/3)*np.pi*R[-1]**3)
-    Aci.append(np.pi * R[-1]**2)
+    Mtot = Mtot + rho * (4 / 3) * np.pi * R[-1] ** 3
+    mi.append(rho * (4 / 3) * np.pi * R[-1] ** 3)
+    Aci.append(np.pi * R[-1] ** 2)
     if Mtot >= mTot:
         counter = False
         pTot = i + 1
@@ -48,9 +44,14 @@ while counter:
         print('rMax = ', np.amax(R))
     else:
         i += 1
+
+np.random.seed(10)
+sample = np.random.choice(pTot, 1000, replace=False)  # select random particles to plot
 Aci = np.asarray(Aci)
 R = np.asarray(R).T
 mi = np.asarray(mi)
+plot_R = R[0, sample]
+
 
 # initial trajectories
 Nc = np.array([1., 0, 0]).T     # direction of cough [x, y, z]
@@ -72,14 +73,18 @@ for i in range(pTot):
     nPart[i, 2] = NPart[i, 2] / nMag
 
 v0 = V0 * nPart
+from celluloid import Camera
 
-#---------------- solution arrays --------------------
+# ---------------- solution arrays --------------------
 rSol = []
-vSol = []
-
+r3D = []
+time_arr = []
+fig = plt.figure()
+camera = Camera(fig)
 # ---------------------------------------------
 # ----------- Begin time stepping -------------
 # ---------------------------------------------
+
 ones = np.ones(pTot)
 vi = v0
 ri = np.outer(r0, ones).T
@@ -87,24 +92,27 @@ rSol.append(ri)
 fGrav = np.outer(mi, g)
 inAir = np.ones(len(ri[:, 0]), dtype=bool)
 timeFlight = np.zeros(len(inAir))
-timeArray = []
+
 t_step = 0
-timeArray.append(t_step)
+time_arr.append(t_step)
 i = 0
 
 while np.any(inAir):
-
+    if i % 10 == 0:
+        print('time: ', t_step)
     if t_step > t_tot:
-        print("simulation finished\n")
+        print("simulation finished")
         break
-    if i % 100 == 0:
-        print('time = {} / {}'.format(t_step, t_tot))
+    #     if i % 500 == 0:
+    #         print('time = {} / {}'.format(t_step, t_tot))
     Cd = np.zeros(pTot)
 
     # compute forces
     vdiff = np.linalg.norm(vf - vi, 2, 1)
-
+    print('vdiff = ', vdiff)
     Re = (2 * R * rhoF * vdiff / muf).T
+
+
     cond1 = np.where(np.logical_and(Re > 0, Re <= 1.0))[0]
     cond2 = np.where(np.logical_and(Re > 1.0, Re <= 400))[0]
     cond3 = np.where(np.logical_and(Re > 400, Re <= 3e5))[0]
@@ -122,11 +130,13 @@ while np.any(inAir):
     if len(cond5) > 0:
         Cd[cond5] = 0.18
 
+
     Cd = np.reshape(Cd, (len(Cd), 1))
     vdiff = np.reshape(Cd, (len(vdiff), 1))
 
     # https://stackoverflow.com/questions/18522216/multiplying-across-in-a-numpy-array
     fDrag_constant = np.squeeze(0.5 * Cd * rhoF * Aci * vdiff)
+    print('fdrag shape ', fDrag_constant.shape)
     fDrag = ((vf - vi).T * fDrag_constant).T
 
     fTot = fDrag + fGrav
@@ -138,74 +148,28 @@ while np.any(inAir):
     inAir[contactSubstrate] = False
     ri[contactSubstrate, 1] = 0
 
-    rSol.append(ri)
-    timeArray.append(t_step)
-    # if i % 10 == 0:
-    #     rSol.append(ri)
-    #     time.append(t_step)
-    #         print('rSol = ', rSol[-1])
+    # animate
+    if i % 10 == 0:
+        x2d = ri[sample, 0]
+        y2d = ri[sample, 1]
+        plt.title('time = {}'.format(time_arr[-1]))
+        plt.scatter(r0[0], r0[1], color='k', s=500)
+        plt.scatter(x2d, y2d, c=plot_R, cmap='viridis')
+        plt.xlim(-0.02, 6)
+        plt.ylim(0, 4)
+        camera.snap()
+
+        rSol.append(ri)
 
     t_step += dt
+    time_arr.append(t_step)
     i += 1
-# --------------------------------------------
-finalSol = rSol[-1]
-print('finalSol.shape: ', finalSol.shape)
-np.random.seed(10)
-sample = np.random.choice(pTot, 1000)
 
-counter1 = 0
-Rplot = R * 1e4
-# print('len(rSol) = ', len(rSol))
-# for j in range(len(rSol)):
-#     # if j % 10 == 0:
-#     print('j = {} / {}'.format(j, len(rSol)))
-#     xt = rSol[j]
-#     save_path1 = "/Users/bhopro/Desktop/Berkeley/MSOL/COVID19/output/state_matrix.txt.{}".format(counter1)
-#
-#     f = open(save_path1, "w+")
-#     f.write('time , X-coord , Y-coord , Z-coord \n')
-#
-#     # iterate through number of particles
-#     time_elapsed = timeArray[j]
-#
-#     counter2 = 0
-#
-#     for k in range(len(xt[:, 0])):
-#         x = xt[k, 0]
-#         y = xt[k, 1]
-#         z = xt[k, 2]
-#         mass = mi[k]
-#         f.write('{} , {}, {}, {} \n'.format(time_elapsed, x, y, z))
-#         counter2 += 1
-#
-#     f.close()
-#
-#     counter1 += 1
+animation = camera.animate()
+animation.save('animation1.mp4')
+
+
+
 
 print('')
 print('--- total time: {} min ---'.format((time.time() - start_time) / 60))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
