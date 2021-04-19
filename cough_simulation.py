@@ -11,10 +11,10 @@ start_time = time.time()
 r0 = np.array([0, 2, 0]).T      # starting height (m)
 g = np.array([0, -9.81, 0]).T   # gravity (m/s^2)
 t_tot = 1                        # simulation time (s)
-dt = 1e-6                       # time step (s)
+dt = 1e-3                       # time step (s)
 V0 = 30                         # magnitude of cough velocity (m / s)
 rho = 1000                      # density of particles (kg / m^3)
-mTot = 0.0005                   # total mass of droplets (kg)
+mTot = 0.0001                   # total mass of droplets (kg)
 
 vf = np.array([0, 0, 0]).T      # surrounding fluid velocity (m/s)
 muf = 1.8e-5                    # surrounding fluid viscosity (Pa/s)
@@ -109,7 +109,7 @@ while np.any(inAir):
 
     # compute forces
     vdiff = np.linalg.norm(vf - vi, 2, 1)
-    print('vdiff = ', vdiff)
+    # print('vdiff = ', vdiff.shape)
     Re = (2 * R * rhoF * vdiff / muf).T
 
 
@@ -136,7 +136,6 @@ while np.any(inAir):
 
     # https://stackoverflow.com/questions/18522216/multiplying-across-in-a-numpy-array
     fDrag_constant = np.squeeze(0.5 * Cd * rhoF * Aci * vdiff)
-    print('fdrag shape ', fDrag_constant.shape)
     fDrag = ((vf - vi).T * fDrag_constant).T
 
     fTot = fDrag + fGrav
